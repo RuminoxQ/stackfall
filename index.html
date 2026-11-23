@@ -4036,6 +4036,13 @@ function endTutorial(start) {
 /* ---------- leaderboard data ---------- */
 const BOARD_KEY = 'stackfall.scores.v1';
 const cmp = (mode) => mode === 'sprint' ? (a, b) => a.time - b.time : mode === 'rise' ? (a, b) => b.time - a.time || b.score - a.score : (a, b) => b.score - a.score;
+function pruneLocal() {
+  const cut = Date.now() - KEEP_DAYS * 86400000;
+  const all = store.get(BOARD_KEY, []); const keep = all.filter((e) => (e.ts || 0) >= cut);
+  if (keep.length !== all.length) store.set(BOARD_KEY, keep);
+  const p = store.get('stackfall.players.v1', {}); const cutDay = new Date(cut); const ck = cutDay.getFullYear() + '-' + String(cutDay.getMonth() + 1).padStart(2, '0') + '-' + String(cutDay.getDate()).padStart(2, '0');
+  let ch = false; for (const k in p) if (k < ck) { delete p[k]; ch = true; } if (ch) store.set('stackfall.players.v1', p);
+}
 function allScores() {
   const local = store.get(BOARD_KEY, []);
   const remote = cloudScores || (FB.ok ? FB.scores : null);
@@ -4328,6 +4335,7 @@ function applySettings() {
 /* ---------- shared leaderboard (artifact db) ---------- */
 let DB = null, cloudScores = null, cloudPlays = null;
 /* ---------- shared leaderboard (Firebase Firestore over REST) ---------- */
+const KEEP_DAYS = 7; // scores older than this are removed by fbCleanup(); database rules only allow deleting scores this old
 const FB = { project: 'stackfall-b70b8', key: 'AIzaSyAL_6jGf9rP_B_KZ1GV8MQSq19RiHvNvi0', ok: false, scores: [], ids: new Set(), since: 0, day: '', busy: false, lastPoll: -1e9, fails: 0 };
 const fbBase = () => 'https://firestore.googleapis.com/v1/projects/' + FB.project + '/databases/(default)/documents';
 function fbStartOfDay() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
@@ -4361,13 +4369,32 @@ async function fbPoll(force) {
 }
 async function fbAdd(e) {
   if (DB) return;
-  const fields = { day: { stringValue: e.day }, mode: { stringValue: e.mode }, name: { stringValue: e.name.slice(0, 12) }, score: { integerValue: String(Math.round(e.score)) }, time: { integerValue: String(Math.round(e.time)) }, lines: { integerValue: String(e.lines | 0) }, level: { integerValue: String(Math.max(1, e.level | 0)) }, ts: { integerValue: String(Math.round(e.ts)) } };
+  const fields = { day: { stringValue: e.day }, mode: { stringValue: e.mode }, name: { stringValue: e.name.slice(0, 12) }, score: { integerValue: String(Math.round(e.score)) }, time: { integerValue: String(Math.round(e.time)) }, lines: { integerValue: String(e.lines | 0) }, level: { integerValue: String(Math.max(1, e.level | 0)) }, ts: { integerValue: String(Math.round(e.ts)) }, expireAt: { timestampValue: new Date(e.ts + KEEP_DAYS * 86400000).toISOString() } };
   try {
     const r = await fetch(fbBase() + '/scores?documentId=' + encodeURIComponent(e.id) + '&key=' + FB.key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
     if (!r.ok) throw new Error('http ' + r.status);
     if (!FB.ids.has(e.id)) { FB.ids.add(e.id); FB.scores.push(Object.assign({}, e)); }
     FB.ok = true; onCloud();
   } catch (x) { toastMsg('No internet — score saved on this device only'); }
+}
+async function fbCleanup() {
+  if (DB || FB.cleaning) return;
+  const last = store.get('stackfall.cleanup.v1', 0);
+  if (Date.now() - last < 3600000) return;
+  FB.cleaning = true;
+  try {
+    const cut = Date.now() - KEEP_DAYS * 86400000 - 60000;
+    const body = { structuredQuery: { from: [{ collectionId: 'scores' }], where: { fieldFilter: { field: { fieldPath: 'ts' }, op: 'LESS_THAN', value: { integerValue: String(cut) } } }, orderBy: [{ field: { fieldPath: 'ts' } }], limit: 100, select: { fields: [{ fieldPath: 'ts' }] } } };
+    const r = await fetch(fbBase() + ':runQuery?key=' + FB.key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const rows = await r.json();
+    for (const row of rows) {
+      if (!row.document) continue;
+      try { await fetch('https://firestore.googleapis.com/v1/' + row.document.name + '?key=' + FB.key, { method: 'DELETE' }); } catch (e) {}
+    }
+    store.set('stackfall.cleanup.v1', Date.now());
+  } catch (e) {}
+  FB.cleaning = false;
 }
 function onCloud() { const sc = currentScreen(); if (sc === 'leader') renderLeader(); if (sc === 'title') renderTitle(); }
 async function cloudInit(tries) {
@@ -4941,8 +4968,11 @@ function loop(t) {
   requestAnimationFrame(loop);
 }
 applySettings();
+try { pruneLocal(); } catch (e) {}
 cloudInit(0);
 setTimeout(() => fbPoll(true), 1500);
+setTimeout(() => fbCleanup(), 8000);
+setInterval(() => { const s = currentScreen(); if (s === 'title' || s === 'leader') fbCleanup(); }, 600000);
 roomInit(0);
 if (location.hash === '#display') showLeader(true, false); else show('title');
 requestAnimationFrame(loop);

@@ -50,7 +50,8 @@ Scores go to a shared **Firebase Firestore** database (project `stackfall-b70b8`
 
 - The game reads new scores every 15 seconds while the title, leaderboard, game over or name screen is showing.
 - Security rules allow anyone to read scores and add a valid new score, but nobody can edit or delete scores from the game.
-- To remove a score, open the Firebase console → Firestore Database → `scores` and delete the document.
+- Scores are kept for **7 days**. The game deletes older ones automatically (about once an hour, from any open copy of the game), and the rules only allow deleting scores more than 7 days old. Change `KEEP_DAYS` in `index.html` and the `604800000` (7 days in ms) in the rules to keep them longer or shorter.
+- To remove a newer score (a rude name, say), open the Firebase console → Firestore Database → `scores` and delete the document.
 
 ## Credits
 
