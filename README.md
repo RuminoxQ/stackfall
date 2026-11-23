@@ -10,7 +10,11 @@ A falling-block puzzle game built for event booths. It's one self-contained `ind
 ## Modes
 
 - **Booth round**: score as much as you can before time runs out (default 2 minutes).
-- **1v1 Versus**: two players on one screen, each with their own board and a time limit. Clearing lines sends junk rows to your opponent. Whoever tops out loses; if time runs out, the higher score wins.
+- **1v1 Versus**: clearing lines sends junk rows to your opponent. Whoever tops out loses; if time runs out, the higher score wins.
+  - **Same screen**: two boards side by side, with two controllers or one shared keyboard. Works on a tablet held sideways.
+  - **Online**: two devices joined by a 4-letter match code. Only works on the hosted claude.ai version while signed in, not from this file or GitHub Pages.
+- **Garbage race**: survive while junk rows rise from the bottom faster and faster. Ranked by time survived.
+- **Zen**: no game over and calm music, for relaxed play.
 - **Marathon**: endless, speeds up every 10 lines.
 - **Sprint 40**: clear 40 lines as fast as you can.
 
@@ -37,8 +41,13 @@ You can change every keyboard and controller binding in **Settings → Controls*
 - Music that adds layers and speeds up as the level rises
 - A 4-step tutorial that shows the right buttons for the player's device
 - Accessibility options: colour-blind block symbols, high-contrast lines, left-handed touch layout, reduced shake and flashing, slower starting speed
+- QR code on the title screen and big-screen leaderboard so visitors can play on their phones. Set the link in **Settings → Booth**.
 - Booth tools: event name, prize line, round length, leaderboard shown when the game is idle, name entry with a basic rude-word filter, full-screen big-screen leaderboard
 
 ## Leaderboard storage
 
 When run from a file or GitHub Pages, scores are saved in each device's browser (`localStorage`). To share one leaderboard across several devices you'd need a small backend, such as Firebase or Supabase.
+
+## Credits
+
+QR codes are made with [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) by Kazuhiko Arase (MIT licence), which is included in `index.html`.
