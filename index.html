@@ -4038,13 +4038,14 @@ const BOARD_KEY = 'stackfall.scores.v1';
 const cmp = (mode) => mode === 'sprint' ? (a, b) => a.time - b.time : mode === 'rise' ? (a, b) => b.time - a.time || b.score - a.score : (a, b) => b.score - a.score;
 function allScores() {
   const local = store.get(BOARD_KEY, []);
-  if (!cloudScores) return local;
-  const seen = new Set(cloudScores.map((e) => e.id));
-  return cloudScores.concat(local.filter((e) => !seen.has(e.id)));
+  const remote = cloudScores || (FB.ok ? FB.scores : null);
+  if (!remote) return local;
+  const seen = new Set(remote.map((e) => e.id));
+  return remote.concat(local.filter((e) => !seen.has(e.id)));
 }
 function topList(mode) { const d = todayKey(); return allScores().filter((e) => e.day === d && e.mode === mode).sort(cmp(mode)).slice(0, 10); }
 function rankOf(r) { const d = todayKey(); const list = allScores().filter((e) => e.day === d && e.mode === r.mode); const c = cmp(r.mode); return list.filter((e) => c(e, r) < 0).length + 1; }
-function playersToday() { const p = store.get('stackfall.players.v1', {}); const l = p[todayKey()] || 0; return cloudPlays ? Math.max(l, cloudPlays.length) : l; }
+function playersToday() { const p = store.get('stackfall.players.v1', {}); const l = p[todayKey()] || 0; if (cloudPlays) return Math.max(l, cloudPlays.length); if (FB.ok) { const d = todayKey(); return Math.max(l, FB.scores.filter((e) => e.day === d).length); } return l; }
 function countPlayer() {
   const p = store.get('stackfall.players.v1', {}); p[todayKey()] = (p[todayKey()] || 0) + 1; store.set('stackfall.players.v1', p);
   if (DB) { try { DB.collection('plays').doc(Date.now() + '-' + Math.floor(Math.random() * 1e6)).set({ day: todayKey(), ts: Date.now() }).catch(() => {}); } catch (e) {} }
@@ -4056,6 +4057,7 @@ function addScore(name) {
   if (all.length > 3000) all.splice(0, all.length - 3000);
   store.set(BOARD_KEY, all); r.saved = true;
   if (DB) { try { const body = Object.assign({}, e); delete body.id; DB.collection('scores').doc(e.id).set(body).catch(() => toastMsg('Saved on this device only')); } catch (x) {} }
+  else fbAdd(e);
   broadcast({ type: 'scores' });
   return e;
 }
@@ -4304,9 +4306,9 @@ function renderSettings() {
       rowToggle('resetEach', 'Reset player options after each player', 'Accessibility and audio go back to defaults for the next person.'),
       rowSeg('featured', 'Big-screen leaderboard shows', 'Which mode the display screen ranks.', [['ultra', 'Booth round'], ['rise', 'Garbage race'], ['marathon', 'Marathon'], ['sprint', 'Sprint 40']]),
       rowButton('Big-screen leaderboard', 'Shows the leaderboard full screen on this device. For a separate TV, open this page on a second device or window and press Leaderboard.', 'Show leaderboard', () => { showLeader(true, false); goFull(); }),
-      el('div', { class: 'srow' }, [tcol('Shared leaderboard', cloudScores ? 'Connected: every device signed in to this page shares one leaderboard.' : 'Saved on this device only. Sign in to share scores across devices.')]),
+      el('div', { class: 'srow' }, [tcol('Shared leaderboard', cloudScores ? 'Connected: every device signed in to this claude.ai page shares one leaderboard.' : FB.ok ? 'Connected to the online leaderboard (Firebase). Every device using this link shares one leaderboard.' : 'Not connected — scores are saved on this device only. Check the internet connection.')]),
       rowButton('Clear today\'s scores', 'Removes every score saved today on this device.', 'Clear scores', (b) => {
-        if (b.dataset.armed) { const d = todayKey(); if (DB) { (cloudScores || []).forEach((e) => { try { DB.doc('scores/' + e.id).delete().catch(() => {}); } catch (x) {} }); (cloudPlays || []).forEach((id) => { try { DB.doc('plays/' + id).delete().catch(() => {}); } catch (x) {} }); } store.set(BOARD_KEY, store.get(BOARD_KEY, []).filter((e) => e.day !== d)); const p = store.get('stackfall.players.v1', {}); delete p[d]; store.set('stackfall.players.v1', p); broadcast({ type: 'scores' }); b.textContent = 'Cleared'; delete b.dataset.armed; }
+        if (b.dataset.armed) { const d = todayKey(); if (FB.ok && !DB) toastMsg('Online scores can only be removed in the Firebase console'); if (DB) { (cloudScores || []).forEach((e) => { try { DB.doc('scores/' + e.id).delete().catch(() => {}); } catch (x) {} }); (cloudPlays || []).forEach((id) => { try { DB.doc('plays/' + id).delete().catch(() => {}); } catch (x) {} }); } store.set(BOARD_KEY, store.get(BOARD_KEY, []).filter((e) => e.day !== d)); const p = store.get('stackfall.players.v1', {}); delete p[d]; store.set('stackfall.players.v1', p); broadcast({ type: 'scores' }); b.textContent = 'Cleared'; delete b.dataset.armed; }
         else { b.dataset.armed = '1'; b.textContent = 'Press again to confirm'; setTimeout(() => { if (b.dataset.armed) { delete b.dataset.armed; b.textContent = 'Clear scores'; } }, 4000); }
       }, 'ghost'),
       rowButton('Reset all settings', 'Back to factory defaults (scores are kept).', 'Reset settings', () => { S = Object.assign({}, DEFAULTS); S.keys = normBinds(null, KEY_DEFAULTS); S.pad = normBinds(null, PAD_DEFAULTS); capture = null; saveSettings(); renderSettings(); toastMsg('Settings reset'); }, 'ghost'));
@@ -4325,6 +4327,48 @@ function applySettings() {
 
 /* ---------- shared leaderboard (artifact db) ---------- */
 let DB = null, cloudScores = null, cloudPlays = null;
+/* ---------- shared leaderboard (Firebase Firestore over REST) ---------- */
+const FB = { project: 'stackfall-b70b8', key: 'AIzaSyAL_6jGf9rP_B_KZ1GV8MQSq19RiHvNvi0', ok: false, scores: [], ids: new Set(), since: 0, day: '', busy: false, lastPoll: -1e9, fails: 0 };
+const fbBase = () => 'https://firestore.googleapis.com/v1/projects/' + FB.project + '/databases/(default)/documents';
+function fbStartOfDay() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function fbParse(doc) {
+  const f = doc.fields || {}; const n = (k) => Number((f[k] && (f[k].integerValue ?? f[k].doubleValue)) || 0); const s = (k) => (f[k] && f[k].stringValue) || '';
+  return { id: doc.name.split('/').pop(), day: s('day'), mode: s('mode'), name: s('name').slice(0, 12), score: n('score'), time: n('time'), lines: n('lines'), level: n('level') || 1, ts: n('ts') };
+}
+async function fbPoll(force) {
+  if (DB || FB.busy) return;
+  if (!force && (document.hidden || now() - FB.lastPoll < (FB.fails ? Math.min(120000, 15000 * FB.fails) : 15000))) return;
+  FB.busy = true; FB.lastPoll = now();
+  const day = todayKey();
+  if (FB.day !== day) { FB.day = day; FB.scores = []; FB.ids = new Set(); FB.since = fbStartOfDay(); }
+  try {
+    const body = { structuredQuery: { from: [{ collectionId: 'scores' }], where: { fieldFilter: { field: { fieldPath: 'ts' }, op: 'GREATER_THAN_OR_EQUAL', value: { integerValue: String(FB.since) } } }, orderBy: [{ field: { fieldPath: 'ts' } }], limit: 500 } };
+    const r = await fetch(fbBase() + ':runQuery?key=' + FB.key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const rows = await r.json();
+    let added = 0;
+    for (const row of rows) {
+      if (!row.document) continue;
+      const e = fbParse(row.document);
+      FB.since = Math.max(FB.since, e.ts);
+      if (FB.ids.has(e.id) || e.day !== day || !MODES[e.mode] || !e.name) continue;
+      FB.ids.add(e.id); FB.scores.push(e); added++;
+    }
+    const was = FB.ok; FB.ok = true; FB.fails = 0;
+    if (added || !was) onCloud();
+  } catch (e) { FB.fails++; }
+  FB.busy = false;
+}
+async function fbAdd(e) {
+  if (DB) return;
+  const fields = { day: { stringValue: e.day }, mode: { stringValue: e.mode }, name: { stringValue: e.name.slice(0, 12) }, score: { integerValue: String(Math.round(e.score)) }, time: { integerValue: String(Math.round(e.time)) }, lines: { integerValue: String(e.lines | 0) }, level: { integerValue: String(Math.max(1, e.level | 0)) }, ts: { integerValue: String(Math.round(e.ts)) } };
+  try {
+    const r = await fetch(fbBase() + '/scores?documentId=' + encodeURIComponent(e.id) + '&key=' + FB.key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+    if (!r.ok) throw new Error('http ' + r.status);
+    if (!FB.ids.has(e.id)) { FB.ids.add(e.id); FB.scores.push(Object.assign({}, e)); }
+    FB.ok = true; onCloud();
+  } catch (x) { toastMsg('No internet — score saved on this device only'); }
+}
 function onCloud() { const sc = currentScreen(); if (sc === 'leader') renderLeader(); if (sc === 'title') renderTitle(); }
 async function cloudInit(tries) {
   try {
@@ -4890,6 +4934,7 @@ function loop(t) {
   if (scr === 'vs') vsTick(dt);
   liveTick();
   musicTick();
+  if (scr === 'title' || scr === 'leader' || scr === 'over' || scr === 'name') fbPoll(false);
   liveT += dt;
   if (liveT > 500) { liveT = 0; if (G && G.running && G.mode !== 'tutorial') broadcast({ type: 'live', mode: G.mode, score: G.score, time: G.time }); }
   } catch (e) { if (!loop.warned) { loop.warned = true; console.error(e); } }
@@ -4897,6 +4942,7 @@ function loop(t) {
 }
 applySettings();
 cloudInit(0);
+setTimeout(() => fbPoll(true), 1500);
 roomInit(0);
 if (location.hash === '#display') showLeader(true, false); else show('title');
 requestAnimationFrame(loop);

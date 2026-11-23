@@ -46,7 +46,11 @@ You can change every keyboard and controller binding in **Settings → Controls*
 
 ## Leaderboard storage
 
-When run from a file or GitHub Pages, scores are saved in each device's browser (`localStorage`). To share one leaderboard across several devices you'd need a small backend, such as Firebase or Supabase.
+Scores go to a shared **Firebase Firestore** database (project `stackfall-b70b8`, free Spark plan), so every device that opens the GitHub Pages link sees one live leaderboard. Each device also keeps a backup copy in its browser, so games still save without internet.
+
+- The game reads new scores every 15 seconds while the title, leaderboard, game over or name screen is showing.
+- Security rules allow anyone to read scores and add a valid new score, but nobody can edit or delete scores from the game.
+- To remove a score, open the Firebase console → Firestore Database → `scores` and delete the document.
 
 ## Credits
 
