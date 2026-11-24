@@ -1,5 +1,7 @@
 # STACKFALL
 
+*Designed and developed by Kiu Kwan Tai.*
+
 A falling-block puzzle game built for event booths. It's one self-contained `index.html` that runs in any modern browser on PC, laptop, tablet and phone.
 
 ## Play
@@ -63,3 +65,7 @@ Scores go to a shared **Firebase Firestore** database (project `stackfall-b70b8`
 ## Credits
 
 QR codes are made with [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) by Kazuhiko Arase (MIT licence), which is included in `index.html`.
+
+## Copyright
+
+Copyright (c) 2026 Kiu Kwan Tai. All rights reserved. See [LICENSE](LICENSE).

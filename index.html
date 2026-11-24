@@ -1,7 +1,14 @@
 <!DOCTYPE html>
+<!--
+  STACKFALL
+  Designed and developed by Kiu Kwan Tai
+  Copyright (c) 2026 Kiu Kwan Tai. All rights reserved.
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="author" content="Kiu Kwan Tai">
+<meta name="copyright" content="Copyright (c) 2026 Kiu Kwan Tai. All rights reserved.">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>STACKFALL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -297,6 +304,18 @@ body.phone .qrcard,.qrcard[hidden]{display:none}
 @media (max-height:620px),(max-width:700px){.qrcard{display:none}}
 .qrfoot{flex:0 0 auto;border-radius:6px;display:block}
 #qrBigCv{display:block;border-radius:8px;max-width:100%}
+.egg{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(11,6,32,.88);backdrop-filter:blur(4px);padding:24px;overflow:hidden}
+.egg.on{display:flex}
+.egg .rain{position:absolute;inset:0;pointer-events:none}
+.egg .rain i{position:absolute;top:-30px;border-radius:5px;animation:nConfetti linear infinite}
+.egg .eggCard{position:relative;width:min(560px,100%);padding:34px 30px 26px;border-radius:26px;text-align:center;background:rgba(28,12,66,.96);border:3px solid var(--yellow);box-shadow:0 0 40px rgba(255,228,94,.5),inset 0 0 40px rgba(255,228,94,.08);animation:nRise .6s cubic-bezier(.2,.9,.3,1.3) both}
+.egg .found{font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.24em;color:var(--lime);text-shadow:0 0 10px var(--lime)}
+.egg .elogo{margin:10px 0 0;font-family:var(--display);font-size:clamp(30px,6vw,44px);color:#FFF0FA;text-shadow:0 0 14px var(--pink),0 0 34px var(--pink)}
+.egg .by{margin:18px 0 4px;font-size:15px;letter-spacing:.12em;color:#C9B8F0;text-transform:uppercase;font-weight:700}
+.egg .who{font-family:var(--display);font-size:clamp(30px,7vw,52px);line-height:1.05;color:var(--yellow);text-shadow:0 0 18px rgba(255,228,94,.8),0 4px 0 #7A1ACF}
+.egg .copy{margin:14px 0 20px;font-size:14px;color:#E3D6FF}
+.egg .btn{margin:0 auto}
+.sver{margin-top:auto;padding-top:18px;font-family:var(--mono);font-size:11px;color:rgba(185,168,230,.45);background:none;border:0;text-align:left;cursor:default;user-select:none}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 18px;background:var(--panel);border:1px solid var(--line2);border-radius:20px;font-size:14px;z-index:30;display:none}
 
 /* ================= NEON ARCADE THEME ================= */
@@ -711,6 +730,7 @@ body.calm .confetti{display:none}
     <button data-tab="access">Accessibility</button>
     <button data-tab="audio">Audio</button>
     <button data-tab="booth">Booth</button>
+    <button class="sver" id="sver" tabindex="-1" aria-hidden="true">STACKFALL v2.0</button>
   </nav>
   <div class="sbody" id="sbody"></div>
 </section>
@@ -724,6 +744,7 @@ body.calm .confetti{display:none}
   </div>
 </div>
 <div id="badgeToast" role="status" aria-live="polite"><span class="bi" id="btIcon">★</span><span><small>BADGE UNLOCKED</small><b id="btName"></b></span></div>
+<div class="egg" id="egg" role="dialog" aria-modal="true" aria-labelledby="eggWho"><div class="rain" id="eggRain" aria-hidden="true"></div><div class="eggCard"><div class="found">★ SECRET FOUND ★</div><div class="elogo">STACKFALL</div><div class="by">Designed &amp; developed by</div><div class="who" id="eggWho"></div><p class="copy" id="eggCopy"></p><button class="btn primary big" data-act="eggClose">Back to the game</button></div></div>
 <div class="toast" id="toast" role="status"></div>
 <script>
 //---------------------------------------------------------------------
@@ -3026,6 +3047,7 @@ var qrcode = function() {
 </script>
 <script>
 'use strict';
+/* STACKFALL — designed and developed by Kiu Kwan Tai. Copyright (c) 2026 Kiu Kwan Tai. All rights reserved. */
 /* =========================================================
    STACKFALL — block puzzle for event booths
    ========================================================= */
@@ -3871,9 +3893,11 @@ function pollPad(dt) {
     for (const k in HOLDABLE) setHeld('pad', k, false);
     const dir = L ? 'left' : R ? 'right' : (U ? 'up' : D ? 'down' : null);
     if (dir) {
-      if (navRepeat.dir !== dir) { navRepeat.dir = dir; navRepeat.t = 0; navMove(dir); }
+      if (navRepeat.dir !== dir) { navRepeat.dir = dir; navRepeat.t = 0; if (scr === 'title') eggPush({ up: 'U', down: 'D', left: 'L', right: 'R' }[dir]); navMove(dir); }
       else { navRepeat.t += dt; if (navRepeat.t > 320) { navRepeat.t = 220; navMove(dir); } }
     } else navRepeat.dir = null;
+    if (edge(1) && scr === 'title') eggPush('B');
+    if (edge(0) && scr === 'title' && eggPush('A')) { padPrev = b; return; }
     if (edge(0)) { const el = document.activeElement; if (el && el !== document.body && isNavigable(el)) el.click(); else navMove('down'); }
     if (edge(1)) { if (scr === 'name') nameDel(); else backAction(); }
     if (edge(9)) { if (overlayOn) togglePause(); else if (scr === 'name') nameSave(); else if (scr === 'title') $('#title [data-mode="ultra"]').click(); }
@@ -3881,6 +3905,7 @@ function pollPad(dt) {
   padPrev = b; padAxPrev = { u: stickU };
 }
 function navRoot() {
+  if ($('#egg').classList.contains('on')) return $('#egg');
   if ($('#qrOverlay').classList.contains('on')) return $('#qrOverlay');
   if ($('#pause').classList.contains('on')) return $('#pause');
   const tc = $('#tutCard'); if (tc.style.display !== 'none' && currentScreen() === 'game') return tc;
@@ -3981,6 +4006,7 @@ function show(id) {
 }
 function backAction() {
   const s = currentScreen();
+  if ($('#egg').classList.contains('on')) { hideEgg(); return; }
   if ($('#qrOverlay').classList.contains('on')) { $('#qrOverlay').classList.remove('on'); return; }
   if ($('#pause').classList.contains('on')) { togglePause(); return; }
   if (s === 'settings') { settingsBack(); return; }
@@ -4003,6 +4029,7 @@ document.addEventListener('click', (e) => {
     leader: () => showLeader(false, false),
     pause: () => currentScreen() === 'vs' ? vsPause() : togglePause(),
     vsSetup: () => openVsSetup(),
+    eggClose: () => hideEgg(),
     qrBig: () => showQRBig(),
     qrClose: () => $('#qrOverlay').classList.remove('on'),
     olCreate: () => olOpenLobby(true),
@@ -5390,6 +5417,48 @@ function showQRBig() {
   $('#qrOverlay').classList.add('on');
   setTimeout(() => $('#qrOverlay [data-act="qrClose"]').focus(), 30);
 }
+
+/* ---------- easter egg ---------- */
+const EGG = (() => { try { return { who: atob('S2l1IEt3YW4gVGFp'), copy: atob('wqkgMjAyNiBLaXUgS3dhbiBUYWkuIEFsbCByaWdodHMgcmVzZXJ2ZWQu') }; } catch (e) { return { who: '', copy: '' }; } })();
+const EGG_SEQ = ['U', 'U', 'D', 'D', 'L', 'R', 'L', 'R', 'B', 'A'];
+let eggBuf = [], eggTaps = [];
+function eggPush(tok) {
+  eggBuf.push(tok); if (eggBuf.length > EGG_SEQ.length) eggBuf.shift();
+  if (eggBuf.length === EGG_SEQ.length && eggBuf.every((t, i) => t === EGG_SEQ[i])) { eggBuf = []; showEgg(); return true; }
+  return false;
+}
+function eggTap(n) {
+  const t = now(); eggTaps = eggTaps.filter((x) => t - x < 3000); eggTaps.push(t);
+  if (eggTaps.length >= n) { eggTaps = []; showEgg(); }
+}
+function showEgg() {
+  const el = $('#egg'); if (!el || el.classList.contains('on')) return;
+  let who;
+  try { who = decodeURIComponent(escape(EGG.who)); } catch (e) { who = EGG.who; }
+  let copy; try { copy = decodeURIComponent(escape(EGG.copy)); } catch (e) { copy = EGG.copy; }
+  $('#eggWho').textContent = who; $('#eggCopy').textContent = copy;
+  const rain = $('#eggRain'); rain.innerHTML = '';
+  if (!S.calm) {
+    const ks = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+    for (let k = 0; k < 40; k++) { const i = document.createElement('i'); const c = COLORS[ks[k % 7]]; const sz = 10 + (k % 4) * 6; i.style.cssText = 'left:' + ((k * 41) % 100) + '%;width:' + sz + 'px;height:' + sz + 'px;background:radial-gradient(circle at 35% 30%,#fff 0%,' + c + ' 40%);box-shadow:0 0 12px ' + c + ';animation-duration:' + (3 + (k % 6) * 0.6) + 's;animation-delay:' + (-(k % 10) * 0.5) + 's'; rain.append(i); }
+  }
+  el.classList.add('on');
+  audioInit(); sfx('stinger'); setTimeout(() => sfx('level'), 350);
+  if (G && G.running && !G.paused && currentScreen() === 'game') togglePause(true);
+  setTimeout(() => $('#egg [data-act="eggClose"]').focus(), 40);
+}
+function hideEgg() { $('#egg').classList.remove('on'); $('#eggRain').innerHTML = ''; }
+document.addEventListener('keydown', (e) => {
+  if ($('#egg').classList.contains('on')) { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); hideEgg(); } return; }
+  const scr = currentScreen(); if (scr !== 'title' && scr !== 'settings' && scr !== 'leader') return;
+  const map = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R', KeyB: 'B', KeyA: 'A' };
+  if (map[e.code]) eggPush(map[e.code]); else eggBuf = [];
+}, true);
+document.addEventListener('pointerdown', (e) => {
+  if (e.target.closest && e.target.closest('#title .logo')) eggTap(7);
+  if (e.target.closest && e.target.closest('#sver')) eggTap(5);
+});
+try { console.log('%cSTACKFALL%c\nDesigned and developed by Kiu Kwan Tai\n© 2026 Kiu Kwan Tai. All rights reserved.', 'font:700 28px sans-serif;color:#FF3EA5;text-shadow:0 0 8px #FF3EA5', 'font:14px sans-serif;color:#B9A8E6'); } catch (e) {}
 /* =========================================================
    MAIN LOOP
    ========================================================= */

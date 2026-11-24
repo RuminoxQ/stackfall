@@ -1,0 +1,12 @@
+Copyright (c) 2026 Kiu Kwan Tai. All rights reserved.
+
+STACKFALL, including its code, design, artwork and text, was designed and
+developed by Kiu Kwan Tai.
+
+No permission is granted to copy, modify, publish, distribute, sublicense or
+sell this software, or to present it as anyone else's work, without prior
+written permission from Kiu Kwan Tai.
+
+Third-party component: index.html includes qrcode-generator by Kazuhiko Arase
+(https://github.com/kazuhikoarase/qrcode-generator), used under the MIT
+licence. Its copyright notice is kept in the code.
