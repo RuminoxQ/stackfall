@@ -36,6 +36,13 @@ You can change every keyboard and controller binding in **Settings → Controls*
 
 ## Features
 
+- **Neon arcade look**: glowing blocks, an animated synthwave grid and sunset, a flickering neon logo, confetti and bouncy pop-ups
+- **Rival chase**: while you play, see who you're chasing on today's board and how many points you need to pass them
+- **ON FIRE meter**: clear lines on 6 pieces in a row and every clear scores double points
+- **Badges**: unlock achievements during a game (First STACK!, Stack Master, Back-to-back, On Fire, Spin Doctor, Perfectionist, Line Machine, Six Figures, Survivor, Speed Demon)
+- **Results screen**: your rank today, 1–3 stars, badges earned, the board around you and how far you are from #1
+- **Hall of Fame**: big-screen podium with a crown for #1, plus a scrolling ticker of booth highlights on the title and big screen
+
 - Callouts for special moves (4-line STACK!, T-Spins, combos, back-to-back, perfect clear)
 - Row flashes, screen shake and controller or phone vibration that grow with the size of the clear
 - Music that adds layers and speeds up as the level rises
