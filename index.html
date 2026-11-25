@@ -533,6 +533,46 @@ body.phone .rivalCard,body.phone .fireCard{display:none}
 .vbw{border-radius:12px;box-shadow:0 0 22px var(--pc)}
 body.calm #bg .floor i,body.calm .logo,body.calm .playbtn,body.calm .btn.primary,body.calm .qrcard,body.calm .ticker .tk,body.calm #over .rays,body.calm .confetti,body.calm #boardWrap.fire,body.calm .fireCard.hot{animation:none!important}
 body.calm .confetti{display:none}
+/* ---- mobile layout fixes ---- */
+#over{overflow-x:hidden;overflow-y:auto;align-items:flex-start;justify-content:flex-start}
+#over .ovw{margin:auto}
+#title{justify-content:flex-start}
+#name{justify-content:flex-start}
+#name>:first-child{margin-top:auto}
+#name>:last-child{margin-bottom:auto}
+#over .rays{position:fixed}
+.toast{max-width:calc(100vw - 32px);width:max-content;text-align:center;box-sizing:border-box}
+#settings .srow,#settings .card{background:rgba(20,9,50,.97)}
+#settings,#name{background:rgba(11,6,32,.72)}
+body.phone{--tb:min(62px,calc((100vw - 68px) / 5 / var(--tbs,1)))}
+body.phone #touch{max-width:100%;gap:10px}
+body.phone #touch .cl{min-width:0}
+@media (max-width:700px){
+  #over{padding:20px 14px calc(20px + env(safe-area-inset-bottom))}
+  .ovw h1{font-size:clamp(30px,10vw,44px)}
+  .ovgrid .card{flex:1 1 100%}
+  .bgrid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+  .ovw .btnrow{flex-direction:column}
+  .ovw .btnrow .btn{width:100%}
+  #leader{padding:18px 14px 0}
+  #leader>*{flex-shrink:0}
+  .lmain{flex-direction:column;flex:0 0 auto}
+  .podium,.rest{flex:0 0 auto;min-width:0;width:100%}
+  .pcol .ps{font-size:clamp(14px,4.6vw,18px)}
+  .pcol .pn{font-size:clamp(16px,5.2vw,20px)}
+  .pcol .pm{font-size:11px}
+  .podium{padding-top:8px}
+  .pcol .blk{max-height:24vh}
+  .rest li{padding:0 12px;gap:10px;min-height:48px}
+  .rest .r1{width:28px}
+  .rest .r2{font-size:18px}
+  .rest .r3{display:none}
+  .rest .r4{min-width:0;font-size:18px}
+  .lfoot{padding:14px 16px;gap:12px;border-radius:18px}
+  .lfoot .qrimg,.lfoot canvas,.lfoot img{display:none}
+  #leader .ticker{margin:0 -14px;position:sticky;bottom:0}
+  [data-act="full"]{display:none!important}
+}
 @media (prefers-reduced-motion:reduce){#bg .floor i,#bg .fl,.logo,.playbtn,.btn.primary,.qrcard,#over .rays,.confetti{animation:none!important}.confetti,#bg .fl{display:none}.ticker .tk{animation-duration:90s}}
 </style>
 </head>
@@ -5492,5 +5532,4 @@ setInterval(() => { const s = currentScreen(); if (s === 'title' || s === 'leade
 roomInit(0);
 if (location.hash === '#display') showLeader(true, false); else show('title');
 requestAnimationFrame(loop);
-</script>
-</body></html>
+</script></body></html>
