@@ -11,6 +11,13 @@
 <meta name="copyright" content="Copyright (c) 2026 Kiu Kwan Tai. All rights reserved.">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>STACKFALL</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="STACKFALL">
+<meta name="theme-color" content="#0B0620">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -534,6 +541,14 @@ body.phone .rivalCard,body.phone .fireCard{display:none}
 body.calm #bg .floor i,body.calm .logo,body.calm .playbtn,body.calm .btn.primary,body.calm .qrcard,body.calm .ticker .tk,body.calm #over .rays,body.calm .confetti,body.calm #boardWrap.fire,body.calm .fireCard.hot{animation:none!important}
 body.calm .confetti{display:none}
 /* ---- mobile layout fixes ---- */
+html,body{overscroll-behavior:none}
+body.ingame,body.ingame #game,body.ingame #vs{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#pause [data-act="refull"][hidden]{display:none}
+body.standalone [data-act="full"]{display:none!important}
+.fsTip{display:none;position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:25;max-width:calc(100vw - 24px);padding:8px 14px;border-radius:18px;background:rgba(28,12,66,.96);border:2px solid var(--cyan);font-size:13px;text-align:center;box-shadow:0 0 18px rgba(45,226,230,.4)}
+.fsTip.on{display:block}
+#settings .snav{position:sticky;top:0;align-self:flex-start;z-index:3}
+@media (max-width:760px){#settings{justify-content:flex-start;padding-top:0}.snav{position:sticky;top:0;z-index:3;margin:0 calc(-1 * clamp(16px,4vw,56px));padding:12px clamp(16px,4vw,56px) 10px;width:auto;align-self:stretch;background:rgba(11,6,32,.97);border-bottom:2px solid var(--line);gap:6px}.snav button[data-tab]{height:36px;padding:0 10px;border-radius:18px;border:2px solid var(--line2);font-size:13px;flex:1 1 auto;text-align:center}.snav button.on{background:var(--pink);color:#1A0420;border-color:var(--pink);box-shadow:none}.snav h1{font-size:26px;width:auto!important;flex:1 1 calc(100% - 90px);margin:0!important;text-align:right}.snav .sver{display:none}}
 #over{overflow-x:hidden;overflow-y:auto;align-items:flex-start;justify-content:flex-start}
 #over .ovw{margin:auto}
 #title{justify-content:flex-start}
@@ -682,11 +697,14 @@ body.phone #touch .cl{min-width:0}
   <div class="modal">
     <h2 id="pauseH">Paused</h2>
     <button class="btn primary big" data-act="resume">Resume</button>
+    <button class="btn" data-act="refull" hidden>Back to full screen</button>
     <button class="btn" data-act="restart">Restart</button>
     <button class="btn" data-act="settings">Settings</button>
     <button class="btn ghost" data-act="quit">Quit to menu</button>
   </div>
 </div>
+
+<div class="fsTip" id="fsTip" role="status"></div>
 
 <!-- TUTORIAL CARD -->
 <div class="tutCard" id="tutCard" style="display:none" role="dialog" aria-live="polite" aria-labelledby="tutH">
@@ -4795,7 +4813,7 @@ function renderSettings() {
     }
     if (dev === 'keyboard') add(rowRange('das', 'Auto-repeat delay', 'Wait before a held key starts repeating.', 50, 300, 1, (v) => v + ' ms'), rowRange('arr', 'Auto-repeat rate', 'Time between repeats while held. 0 = instant.', 0, 60, 1, (v) => v + ' ms'), rowRange('sdf', 'Soft drop speed', 'How fast ↓ pulls the piece down.', 5, 40, 1, (v) => v + '×'));
     if (dev === 'controller') add(rowRange('dead', 'Stick dead zone', 'Ignore small stick movements.', 10, 60, 1, (v) => v + '%'), rowRange('das', 'Auto-repeat delay', 'Wait before a held direction repeats.', 50, 300, 1, (v) => v + ' ms'), rowToggle('vibrate', 'Vibration', 'Rumble on line clears and drops.'));
-    if (dev === 'touch') add(rowSeg('touchBtns', 'On-screen buttons', 'Auto shows them when the screen is touched.', [['auto', 'Auto'], ['on', 'Always'], ['off', 'Off']], () => applyDeviceUI()), rowSeg('touchSize', 'Button size', 'Bigger buttons are easier to hit.', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']]), rowToggle('lefty', 'Left-handed layout', 'Rotate and drop on the left, move and hold on the right.'), rowToggle('gestures', 'Gestures on the board', 'Swipe, tap and flick on the board itself.'), rowRange('swipe', 'Swipe distance', 'Finger travel to move one cell.', 16, 56, 1, (v) => v + ' px'), rowToggle('vibrate', 'Vibrate', 'Short buzz on taps and clears (phones).'));
+    if (dev === 'touch') add(rowSeg('touchBtns', 'On-screen buttons', 'Auto shows them when the screen is touched.', [['auto', 'Auto'], ['on', 'Always'], ['off', 'Off']], () => applyDeviceUI()), rowSeg('touchSize', 'Button size', 'Bigger buttons are easier to hit.', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']]), rowToggle('lefty', 'Left-handed layout', 'Rotate and drop on the left, move and hold on the right.'), rowToggle('gestures', 'Gestures on the board', 'Swipe, tap and flick on the board itself.'), rowRange('swipe', 'Swipe distance', 'Finger travel to move one cell.', 16, 56, 1, (v) => v + ' px'), rowToggle('vibrate', 'Vibrate', 'Short buzz on taps and clears (phones).'), rowButton('Full screen', 'Swipes on the board no longer pull the page around. For the steadiest full screen on a phone or iPad, add STACKFALL to your Home Screen (Share, then Add to Home Screen) and open it from there.', 'Go full screen', () => goFull()));
     add(rowToggle('keyHints', 'Show control hints in game', 'The Controls list beside the board.'));
   }
   if (settingsTab === 'access') {
@@ -5499,6 +5517,50 @@ document.addEventListener('pointerdown', (e) => {
   if (e.target.closest && e.target.closest('#sver')) eggTap(5);
 });
 try { console.log('%cSTACKFALL%c\nDesigned and developed by Kiu Kwan Tai\n© 2026 Kiu Kwan Tai. All rights reserved.', 'font:700 28px sans-serif;color:#FF3EA5;text-shadow:0 0 8px #FF3EA5', 'font:14px sans-serif;color:#B9A8E6'); } catch (e) {}
+
+/* ---- touch lock + full screen keeper (phones / tablets) ---- */
+(() => {
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const canFs = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  const standalone = () => (window.matchMedia && (matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches)) || navigator.standalone === true;
+  let wantFull = false;
+  // Stop the browser from treating in-game swipes as scroll / pull-down / exit gestures.
+  const inPlay = () => document.body.classList.contains('ingame') && !$('#pause').classList.contains('on');
+  const block = (e) => { if (inPlay() && e.cancelable) e.preventDefault(); };
+  document.addEventListener('touchmove', block, { passive: false });
+  const bwEl = $('#boardWrap');
+  bwEl && bwEl.addEventListener('touchstart', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  // Better fullscreen request (Safari needs the webkit one on older iPadOS).
+  window.goFull = goFull = function () {
+    const d = document.documentElement;
+    try {
+      const r = d.requestFullscreen ? d.requestFullscreen({ navigationUI: 'hide' }) : d.webkitRequestFullscreen && d.webkitRequestFullscreen();
+      r && r.catch && r.catch(() => {});
+    } catch (e) {}
+    wantFull = true;
+  };
+  const tip = $('#fsTip'); let tipT = 0;
+  const showTip = (msg) => { if (!tip) return; tip.textContent = msg; tip.classList.add('on'); clearTimeout(tipT); tipT = setTimeout(() => tip.classList.remove('on'), 5200); };
+  const onFs = () => {
+    const btn = $('#pause [data-act="refull"]');
+    if (fsEl()) { wantFull = true; btn && (btn.hidden = true); return; }
+    if (!wantFull) return;
+    // Left full screen by accident in the middle of a game: pause so nothing is lost.
+    const scr = currentScreen();
+    if (scr === 'game' && typeof gameLive === 'function' && gameLive()) togglePause(true);
+    else if (scr === 'vs' && typeof VS !== 'undefined' && VS && !VS.over && !VS.online && !$('#pause').classList.contains('on')) vsPause();
+    if (btn) btn.hidden = !canFs;
+    if (scr === 'game' || scr === 'vs') showTip(isTouchCapable ? 'Left full screen. Tap "Back to full screen", or Add to Home Screen for a full-screen app.' : 'Left full screen.');
+  };
+  document.addEventListener('fullscreenchange', onFs);
+  document.addEventListener('webkitfullscreenchange', onFs);
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-act="refull"]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation(); goFull(); b.hidden = true;
+  }, true);
+  window.addEventListener('load', () => { if (standalone()) document.body.classList.add('standalone'); });
+})();
 /* =========================================================
    MAIN LOOP
    ========================================================= */
