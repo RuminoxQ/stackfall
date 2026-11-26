@@ -3136,7 +3136,7 @@ const broadcast = (m) => { try { chan && chan.postMessage(m); } catch (e) {} };
 const ACCESS_DEFAULTS = { patterns: false, contrast: false, lefty: false, calm: false, ghost: true, speed: 'normal' };
 const AUDIO_DEFAULTS = { music: 60, sfx: 70, mute: false };
 const DEFAULTS = Object.assign({
-  das: 133, arr: 10, sdf: 20, dead: 25, swipe: 28,
+  das: 133, arr: 10, sdf: 6, sdfV: 2, dead: 25, swipe: 28,
   vibrate: true, gestures: true, touchBtns: 'auto', keyHints: true,
   eventName: '', prize: 'Highest score today wins', roundSec: 120, tutorialFirst: true,
   idle: 45, resetEach: true, featured: 'ultra', touchSize: 'm', vsSec: 120, qrUrl: 'https://ruminoxq.github.io/stackfall/', qrTitle: true
@@ -3149,7 +3149,10 @@ function normBinds(v, def) {
   for (const [a] of ACTIONS) { const x = v && Array.isArray(v[a]) ? v[a] : def[a]; out[a] = [x[0] ?? null, x[1] ?? null]; }
   return out;
 }
-let S = Object.assign({}, DEFAULTS, store.get('stackfall.settings.v1', {}));
+const savedS = store.get('stackfall.settings.v1', {}) || {};
+let S = Object.assign({}, DEFAULTS, savedS);
+// soft drop used to default to 20x, which felt like an instant drop; move old saves to the new gentler default
+if (savedS.sdfV !== 2) { if (S.sdf === 20) S.sdf = DEFAULTS.sdf; S.sdfV = 2; }
 S.keys = normBinds(S.keys, KEY_DEFAULTS); S.pad = normBinds(S.pad, PAD_DEFAULTS);
 const saveSettings = () => { store.set('stackfall.settings.v1', S); applySettings(); };
 
@@ -3479,7 +3482,10 @@ function update(dt) {
   handleRepeat(dt);
   if (G.gravityOn) {
     const soft = (G.held || held).soft;
-    const g = soft ? Math.min(gravityMs(), Math.max(1000 / 60, gravityMs() / S.sdf)) : gravityMs();
+    // soft drop: a multiple of gravity, but never faster than ~22 rows a second so it stays controllable
+    const g = soft ? Math.min(gravityMs(), Math.max(45, gravityMs() / S.sdf)) : gravityMs();
+    // time banked toward the next normal fall must not turn into a burst of rows the moment soft drop starts
+    if (soft !== !!G.softWas) { G.dropAcc = Math.min(G.dropAcc, soft ? 0 : G.dropAcc); G.softWas = soft; }
     G.dropAcc += dt;
     while (G.dropAcc >= g && G.cur) {
       G.dropAcc -= g;
@@ -4018,7 +4024,7 @@ const bw = $('#boardWrap');
 bw.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'touch' || !S.gestures) return;
   e.preventDefault(); setDevice('touch');
-  gest.pts.set(e.pointerId, { x0: e.clientX, y0: e.clientY, ax: e.clientX, ay: e.clientY, t0: now(), moved: false, softs: 0 });
+  gest.pts.set(e.pointerId, { x0: e.clientX, y0: e.clientY, ax: e.clientX, ay: e.clientY, t0: now(), moved: false, softs: 0, hist: [[now(), e.clientY]] });
   if (gest.pts.size > 1) gest.multi = true;
   try { bw.setPointerCapture(e.pointerId); } catch (x) {}
 });
@@ -4027,20 +4033,27 @@ bw.addEventListener('pointermove', (e) => {
   const step = S.swipe;
   while (e.clientX - p.ax >= step) { p.ax += step; p.moved = true; if (gameLive()) tryMove(1); }
   while (p.ax - e.clientX >= step) { p.ax -= step; p.moved = true; if (gameLive()) tryMove(-1); }
-  const dt = now() - p.t0, dy = e.clientY - p.y0;
-  const fast = dy / Math.max(dt, 1) > 0.9;
-  if (!fast) while (e.clientY - p.ay >= step) { p.ay += step; p.moved = true; p.softs++; if (gameLive() && !(G.mode === 'tutorial' && TUT.step < 3)) softStep(); }
+  const t = now(); p.hist.push([t, e.clientY]); while (p.hist.length > 2 && t - p.hist[0][0] > 120) p.hist.shift();
+  const v = gestVel(p); p.peak = Math.max(p.peak || 0, v);
+  const fast = v > 1.1 && p.softs <= 1;
+  // slow drag down = one row per finger step (a bit more than the sideways step so it feels deliberate)
+  const vstep = step * 1.25;
+  if (!fast) while (e.clientY - p.ay >= vstep) { p.ay += vstep; p.moved = true; p.softs++; if (gameLive() && !(G.mode === 'tutorial' && TUT.step < 3)) softStep(); }
+  else p.ay = e.clientY;
 });
+// finger speed over the last ~120 ms, in px per ms (downwards positive)
+function gestVel(p) { const h = p.hist, a = h[0], b = h[h.length - 1]; return (b[1] - a[1]) / Math.max(16, b[0] - a[0]); }
 const gestEnd = (e) => {
   const p = gest.pts.get(e.pointerId); if (!p) return;
   gest.pts.delete(e.pointerId);
+  { const t = now(); p.hist.push([t, e.clientY]); while (p.hist.length > 2 && t - p.hist[0][0] > 120) p.hist.shift(); }
   const dt = now() - p.t0, dx = e.clientX - p.x0, dy = e.clientY - p.y0;
   if (gest.multi) { if (!gest.pts.size) { gest.multi = false; if (dt < 300) act('r180'); } return; }
   if (e.type === 'pointercancel') return;
   if (!p.moved && dt < 280 && Math.hypot(dx, dy) < 14) {
     const r = bw.getBoundingClientRect();
     act(e.clientX < r.left + r.width / 2 ? 'ccw' : 'cw');
-  } else if (dy > 50 && dy / dt > 0.9 && Math.abs(dx) < dy * 0.6) act('hard');
+  } else if (dy > 50 && Math.abs(dx) < dy * 0.6 && (p.peak || 0) > 1.1 && (p.softs <= 1 || p.peak > 1.8)) act('hard');
   else if (dy < -50 && Math.abs(dx) < -dy * 0.6 && dt < 400) act('hold');
 };
 bw.addEventListener('pointerup', gestEnd); bw.addEventListener('pointercancel', gestEnd);
@@ -4811,9 +4824,9 @@ function renderSettings() {
       add(el('p', { style: 'margin:0;font-size:14px;color:var(--muted)', text: kind === 'key' ? 'Click a box, then press the new key. Esc cancels, Backspace clears. A key already used elsewhere moves to the new action.' : 'Select a box, then press the new button on the controller. Wait 8 seconds to cancel. The left stick always moves, soft drops and (pushed up) hard drops; menus always use the D-pad, A and B.' }), tbl);
       add(rowButton(kind === 'key' ? 'Reset keyboard controls' : 'Reset controller buttons', 'Back to the standard layout.', 'Reset', () => { if (kind === 'key') S.keys = normBinds(null, KEY_DEFAULTS); else S.pad = normBinds(null, PAD_DEFAULTS); capture = null; saveSettings(); renderSettings(); toastMsg('Controls reset'); }, 'ghost'));
     }
-    if (dev === 'keyboard') add(rowRange('das', 'Auto-repeat delay', 'Wait before a held key starts repeating.', 50, 300, 1, (v) => v + ' ms'), rowRange('arr', 'Auto-repeat rate', 'Time between repeats while held. 0 = instant.', 0, 60, 1, (v) => v + ' ms'), rowRange('sdf', 'Soft drop speed', 'How fast ↓ pulls the piece down.', 5, 40, 1, (v) => v + '×'));
-    if (dev === 'controller') add(rowRange('dead', 'Stick dead zone', 'Ignore small stick movements.', 10, 60, 1, (v) => v + '%'), rowRange('das', 'Auto-repeat delay', 'Wait before a held direction repeats.', 50, 300, 1, (v) => v + ' ms'), rowToggle('vibrate', 'Vibration', 'Rumble on line clears and drops.'));
-    if (dev === 'touch') add(rowSeg('touchBtns', 'On-screen buttons', 'Auto shows them when the screen is touched.', [['auto', 'Auto'], ['on', 'Always'], ['off', 'Off']], () => applyDeviceUI()), rowSeg('touchSize', 'Button size', 'Bigger buttons are easier to hit.', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']]), rowToggle('lefty', 'Left-handed layout', 'Rotate and drop on the left, move and hold on the right.'), rowToggle('gestures', 'Gestures on the board', 'Swipe, tap and flick on the board itself.'), rowRange('swipe', 'Swipe distance', 'Finger travel to move one cell.', 16, 56, 1, (v) => v + ' px'), rowToggle('vibrate', 'Vibrate', 'Short buzz on taps and clears (phones).'), rowButton('Full screen', 'Swipes on the board no longer pull the page around. For the steadiest full screen on a phone or iPad, add STACKFALL to your Home Screen (Share, then Add to Home Screen) and open it from there.', 'Go full screen', () => goFull()));
+    if (dev === 'keyboard') add(rowRange('das', 'Auto-repeat delay', 'Wait before a held key starts repeating.', 50, 300, 1, (v) => v + ' ms'), rowRange('arr', 'Auto-repeat rate', 'Time between repeats while held. 0 = instant.', 0, 60, 1, (v) => v + ' ms'), rowRange('sdf', 'Soft drop speed', 'How fast holding ↓ pulls the piece down. Lower is easier to control.', 2, 30, 1, (v) => v + '×'));
+    if (dev === 'controller') add(rowRange('dead', 'Stick dead zone', 'Ignore small stick movements.', 10, 60, 1, (v) => v + '%'), rowRange('das', 'Auto-repeat delay', 'Wait before a held direction repeats.', 50, 300, 1, (v) => v + ' ms'), rowRange('sdf', 'Soft drop speed', 'How fast holding down pulls the piece. Lower is easier to control.', 2, 30, 1, (v) => v + '×'), rowToggle('vibrate', 'Vibration', 'Rumble on line clears and drops.'));
+    if (dev === 'touch') add(rowSeg('touchBtns', 'On-screen buttons', 'Auto shows them when the screen is touched.', [['auto', 'Auto'], ['on', 'Always'], ['off', 'Off']], () => applyDeviceUI()), rowSeg('touchSize', 'Button size', 'Bigger buttons are easier to hit.', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']]), rowToggle('lefty', 'Left-handed layout', 'Rotate and drop on the left, move and hold on the right.'), rowToggle('gestures', 'Gestures on the board', 'Swipe, tap and flick on the board itself.'), rowRange('swipe', 'Swipe distance', 'Finger travel to move one cell. Dragging down needs a little more per row.', 16, 56, 1, (v) => v + ' px'), rowRange('sdf', 'Soft drop speed', 'How fast holding ▼ pulls the piece down. Lower is easier to control.', 2, 30, 1, (v) => v + '×'), rowToggle('vibrate', 'Vibrate', 'Short buzz on taps and clears (phones).'), rowButton('Full screen', 'Swipes on the board no longer pull the page around. For the steadiest full screen on a phone or iPad, add STACKFALL to your Home Screen (Share, then Add to Home Screen) and open it from there.', 'Go full screen', () => goFull()));
     add(rowToggle('keyHints', 'Show control hints in game', 'The Controls list beside the board.'));
   }
   if (settingsTab === 'access') {
